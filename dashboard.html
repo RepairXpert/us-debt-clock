@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>US Debt Clock - Real-time Fiscal Intelligence</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0f172a;
+            --secondary: #1e293b;
+            --accent: #3b82f6;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --text: #f1f5f9;
+            --text-dim: #cbd5e1;
+            --border: #334155;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, var(--primary) 0%, #0d1427 100%);
+            color: var(--text);
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px 0;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, var(--accent), #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--text-dim);
+            font-size: 1rem;
+        }
+
+        .debt-counter {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            margin-bottom: 40px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .debt-value {
+            font-size: 3.5rem;
+            font-weight: 700;
+            font-family: 'Monaco', monospace;
+            margin-bottom: 15px;
+            color: var(--accent);
+            text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+
+        .counter-label {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .per-second {
+            font-size: 1.1rem;
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .metric-card {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+        }
+
+        .metric-label {
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            font-family: 'Monaco', monospace;
+            margin-bottom: 5px;
+        }
+
+        .metric-subtext {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+
+        .regime-section {
+            background: rgba(30, 41, 59, 0.8);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 40px;
+            backdrop-filter: blur(10px);
+        }
+
+        .regime-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .regime-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .regime-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .regime-stable { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .regime-elevated { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .regime-critical { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .regime-crisis { background: rgba(239, 68, 68, 0.3); color: #fca5a5; }
+
+        .pressure-gauge {
+            width: 100%;
+            height: 30px;
+            background: linear-gradient(90deg,
+                var(--success) 0%,
+                var(--warning) 40%,
+                var(--danger) 70%,
+                #dc2626 100%);
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .pressure-indicator {
+            position: absolute;
+            width: 4px;
+            height: 100%;
+            background: white;
+            top: 0;
+            border-radius: 2px;
+        }
+
+        .regime-description {
+            color: var(--text-dim);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-top: 15px;
+        }
+
+        .charts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .chart-container {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            max-height: 350px;
+        }
+
+        .comparison-table {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 40px;
+            overflow-x: auto;
+            backdrop-filter: blur(10px);
+        }
+
+        .comparison-table h2 {
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 2px solid var(--border);
+            color: var(--text-dim);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        tr:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .us-row {
+            background: rgba(59, 130, 246, 0.1);
+            font-weight: 600;
+        }
+
+        .forecast-section {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 40px;
+            backdrop-filter: blur(10px);
+        }
+
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .scenario-card {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .scenario-name {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--accent);
+        }
+
+        .scenario-desc {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 15px;
+        }
+
+        .scenario-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            font-family: 'Monaco', monospace;
+        }
+
+        .alerts-section {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 40px;
+            backdrop-filter: blur(10px);
+        }
+
+        .alert-item {
+            padding: 15px;
+            border-left: 4px solid var(--border);
+            margin-bottom: 10px;
+            background: rgba(59, 130, 246, 0.05);
+            border-radius: 4px;
+        }
+
+        .alert-critical { border-left-color: var(--danger); }
+        .alert-warning { border-left-color: var(--warning); }
+        .alert-info { border-left-color: var(--accent); }
+
+        .alert-level {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .level-critical { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .level-warning { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .level-info { background: rgba(59, 130, 246, 0.2); color: var(--accent); }
+
+        .alert-message {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .alert-action {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+
+        .premium-banner {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2));
+            border: 1px solid rgba(139, 92, 246, 0.5);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 40px;
+            backdrop-filter: blur(10px);
+        }
+
+        .premium-text {
+            color: var(--text-dim);
+            margin-bottom: 15px;
+        }
+
+        .premium-button {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .premium-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(139, 92, 246, 0.4);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-dim);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .last-updated {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .debt-value {
+                font-size: 2rem;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 0.8rem;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>US Debt Clock</h1>
+            <p class="subtitle">Real-time National Debt Tracking with Fiscal Intelligence</p>
+        </header>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Loading data...</p>
+        </div>
+
+        <div id="content" style="display: none;">
+            <!-- Debt Counter -->
+            <div class="debt-counter">
+                <div class="counter-label">National Debt</div>
+                <div class="debt-value" id="debtValue">$0</div>
+                <div class="per-second">Increasing at <span id="perSecond">$0</span>/second</div>
+                <div class="counter-label" style="margin-top: 15px; font-size: 0.8rem;" id="lastUpdate"></div>
+            </div>
+
+            <!-- Key Metrics -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Debt Per Capita</div>
+                    <div class="metric-value" id="debtPerCapita">$0</div>
+                    <div class="metric-subtext">Per person</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Debt-to-GDP Ratio</div>
+                    <div class="metric-value" id="debtToGdp">0%</div>
+                    <div class="metric-subtext">% of annual GDP</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Annual Deficit</div>
+                    <div class="metric-value" id="annualDeficit">$0</div>
+                    <div class="metric-subtext">This fiscal year</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Interest Expense (Today)</div>
+                    <div class="metric-value" id="interestToday">$0</div>
+                    <div class="metric-subtext">One day's interest</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Interest as % of Revenue</div>
+                    <div class="metric-value" id="interestPct">0%</div>
+                    <div class="metric-subtext">Of federal revenue</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Unemployment Rate</div>
+                    <div class="metric-value" id="unemployment">0%</div>
+                    <div class="metric-subtext">National average</div>
+                </div>
+            </div>
+
+            <!-- Fiscal Regime -->
+            <div class="regime-section">
+                <div class="regime-header">
+                    <div class="regime-title">Fiscal Pressure Index</div>
+                    <div class="regime-badge" id="regimeBadge"></div>
+                </div>
+                <div class="pressure-gauge">
+                    <div class="pressure-indicator" id="pressureIndicator"></div>
+                </div>
+                <div style="text-align: right; margin-bottom: 15px;">
+                    <span id="pressureValue">0</span> / 100
+                </div>
+                <div class="regime-description" id="regimeDescription"></div>
+            </div>
+
+            <!-- Alerts -->
+            <div class="alerts-section">
+                <h2>System Alerts</h2>
+                <div id="alertsContainer"></div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-section">
+                <div class="chart-container">
+                    <div class="chart-title">National Debt Trend (1 Year)</div>
+                    <canvas id="debtChart"></canvas>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-title">Debt-to-GDP Trend</div>
+                    <canvas id="debtToGdpChart"></canvas>
+                </div>
+            </div>
+
+            <!-- G7 Comparison -->
+            <div class="comparison-table">
+                <h2>G7 Comparison</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Country</th>
+                            <th>Total Debt</th>
+                            <th>Debt-to-GDP</th>
+                            <th>Per Capita</th>
+                            <th>Interest as % Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody id="comparisonBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Forecast -->
+            <div class="forecast-section">
+                <h2>Debt Forecast (Linear Projection)</h2>
+                <p style="color: var(--text-dim); margin-bottom: 20px;">Scenarios based on different policy trajectories</p>
+                <div class="scenario-grid" id="scenariosContainer"></div>
+            </div>
+
+            <!-- Premium Banner -->
+            <div class="premium-banner">
+                <div class="premium-text">Want advanced analytics, alerts, and policy forecasting?</div>
+                <button class="premium-button">Upgrade to Premium ($9/month)</button>
+            </div>
+
+            <div class="last-updated" id="timestamp"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script>
+        const API_BASE = '/';
+        let charts = {};
+        let wsConnection = null;
+
+        async function formatCurrency(value) {
+            if (Math.abs(value) >= 1e12) {
+                return '$' + (value / 1e12).toFixed(2) + 'T';
+            } else if (Math.abs(value) >= 1e9) {
+                return '$' + (value / 1e9).toFixed(2) + 'B';
+            } else if (Math.abs(value) >= 1e6) {
+                return '$' + (value / 1e6).toFixed(2) + 'M';
+            }
+            return '$' + value.toFixed(0);
+        }
+
+        async function loadCurrentData() {
+            try {
+                const response = await fetch(`${API_BASE}current`);
+                const data = await response.json();
+
+                // Update counter
+                document.getElementById('debtValue').textContent = formatCurrency(data.national_debt);
+                document.getElementById('debtPerCapita').textContent = formatCurrency(data.debt_per_capita);
+                document.getElementById('debtToGdp').textContent = data.debt_to_gdp.toFixed(1) + '%';
+                document.getElementById('annualDeficit').textContent = formatCurrency(data.annual_deficit);
+                document.getElementById('interestToday').textContent = formatCurrency(data.interest_expense_today);
+                document.getElementById('interestPct').textContent = data.interest_as_pct_revenue.toFixed(1) + '%';
+                document.getElementById('unemployment').textContent = data.unemployment.toFixed(1) + '%';
+                document.getElementById('lastUpdate').textContent = new Date(data.timestamp).toLocaleTimeString();
+
+                // Update regime
+                updateRegime(data);
+
+                // Load alerts
+                loadAlerts();
+
+                // Load comparison
+                loadComparison();
+
+                // Load forecast
+                loadForecast();
+
+                // Load history charts
+                loadHistoryCharts();
+
+                // Show content
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+
+                // Connect to WebSocket for live updates
+                connectWebSocket();
+
+                // Update timestamp
+                document.getElementById('timestamp').textContent = `Last updated: ${new Date(data.timestamp).toLocaleString()}`;
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('loading').innerHTML = '<p style="color: var(--danger);">Error loading data. Please refresh.</p>';
+            }
+        }
+
+        function updateRegime(data) {
+            const regime = data.fiscal_regime;
+            const pressure = data.fiscal_pressure_index;
+
+            const badge = document.getElementById('regimeBadge');
+            badge.className = `regime-badge regime-${regime}`;
+            badge.textContent = regime.toUpperCase();
+
+            document.getElementById('pressureValue').textContent = pressure.toFixed(0);
+            document.getElementById('pressureIndicator').style.left = (pressure / 100 * 100) + '%';
+
+            document.getElementById('regimeDescription').textContent = getRegimeDescription(regime);
+        }
+
+        function getRegimeDescription(regime) {
+            const descriptions = {
+                'stable': 'Fiscal metrics are within sustainable ranges. Interest burden manageable.',
+                'elevated': 'Growing fiscal pressures. Monitor deficit trajectory and interest rates.',
+                'critical': 'Significant fiscal stress. Policy action needed to stabilize metrics.',
+                'crisis': 'Severe fiscal imbalance. Immediate intervention required.'
+            };
+            return descriptions[regime] || 'Unknown regime';
+        }
+
+        async function loadAlerts() {
+            try {
+                const response = await fetch(`${API_BASE}alerts`);
+                const data = await response.json();
+
+                const container = document.getElementById('alertsContainer');
+                if (data.alerts.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-dim);">No active alerts</p>';
+                    return;
+                }
+
+                container.innerHTML = data.alerts.map(alert => `
+                    <div class="alert-item alert-${alert.level}">
+                        <div class="alert-level level-${alert.level}">${alert.level}</div>
+                        <div class="alert-message">${alert.message}</div>
+                        <div class="alert-action">→ ${alert.action}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+            }
+        }
+
+        async function loadComparison() {
+            try {
+                const response = await fetch(`${API_BASE}compare`);
+                const data = await response.json();
+
+                const tbody = document.getElementById('comparisonBody');
+                tbody.innerHTML = data.countries.map((country, idx) => `
+                    <tr ${country.country === 'US' ? 'class="us-row"' : ''}>
+                        <td><strong>${country.country}</strong></td>
+                        <td>${country.debt_formatted}</td>
+                        <td>${country.debt_to_gdp.toFixed(1)}%</td>
+                        <td>${formatCurrency(country.debt_per_capita)}</td>
+                        <td>${country.interest_as_pct_revenue.toFixed(1)}%</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading comparison:', error);
+            }
+        }
+
+        async function loadForecast() {
+            try {
+                const response = await fetch(`${API_BASE}forecast`);
+                const data = await response.json();
+
+                const container = document.getElementById('scenariosContainer');
+                container.innerHTML = Object.entries(data.scenarios).map(([key, scenario]) => `
+                    <div class="scenario-card">
+                        <div class="scenario-name">${key.toUpperCase()}</div>
+                        <div class="scenario-desc">${scenario.description}</div>
+                        <div style="margin-top: 10px;">
+                            <div style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 5px;">1 Year</div>
+                            <div class="scenario-value">${formatCurrency(scenario.debt_in_1yr)}</div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <div style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 5px;">5 Years</div>
+                            <div class="scenario-value">${formatCurrency(scenario.debt_in_5yr)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading forecast:', error);
+            }
+        }
+
+        async function loadHistoryCharts() {
+            try {
+                const response = await fetch(`${API_BASE}history?metric=debt&period=1y`);
+                const data = await response.json();
+
+                if (data.data && data.data.length > 0) {
+                    const dates = data.data.map(d => d.date).reverse();
+                    const debts = data.data.map(d => d.debt / 1e12).reverse();
+
+                    createChart('debtChart', dates, debts, 'National Debt (Trillions)');
+                }
+            } catch (error) {
+                console.error('Error loading charts:', error);
+            }
+        }
+
+        function createChart(canvasId, labels, data, label) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+
+            if (charts[canvasId]) {
+                charts[canvasId].destroy();
+            }
+
+            charts[canvasId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#3b82f6'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: {
+                                color: '#cbd5e1'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                color: '#cbd5e1'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                color: '#cbd5e1'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            wsConnection = new WebSocket(`${protocol}//${window.location.host}/ws/live`);
+
+            wsConnection.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                document.getElementById('debtValue').textContent = data.debt_formatted;
+                document.getElementById('perSecond').textContent = formatCurrency(data.per_second_increase);
+            };
+
+            wsConnection.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            wsConnection.onclose = () => {
+                console.log('WebSocket closed, reconnecting in 5s...');
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+
+        // Load data on page load
+        window.addEventListener('load', loadCurrentData);
+
+        // Reload data every 5 minutes
+        setInterval(loadCurrentData, 5 * 60 * 1000);
+    </script>
+</body>
+</html>

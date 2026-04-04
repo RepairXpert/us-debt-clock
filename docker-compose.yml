@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  debt-clock-api:
+    build: .
+    ports:
+      - "8500:8500"
+    environment:
+      FRED_KEY: ${FRED_KEY}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+    volumes:
+      - ./debt_clock.db:/app/debt_clock.db
+      - ./patterns.jsonl:/app/patterns.jsonl
+      - ./health.jsonl:/app/health.jsonl
+      - ./alerts_history.jsonl:/app/alerts_history.jsonl
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8500/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Monitor container for self-healing
+  debt-clock-monitor:
+    build: .
+    command: python self_heal.py
+    environment:
+      FRED_KEY: ${FRED_KEY}
+    volumes:
+      - ./debt_clock.db:/app/debt_clock.db
+      - ./patterns.jsonl:/app/patterns.jsonl
+      - ./health.jsonl:/app/health.jsonl
+    restart: unless-stopped
+    depends_on:
+      - debt-clock-api
