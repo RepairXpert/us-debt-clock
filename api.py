@@ -26,7 +26,14 @@ from data_collector import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="US Debt Clock", version="1.0.0")
+_is_debug = os.getenv("DEBUG", "").lower() in ("1", "true", "yes")
+app = FastAPI(
+    title="US Debt Clock",
+    version="1.0.0",
+    docs_url="/docs" if _is_debug else None,
+    redoc_url="/redoc" if _is_debug else None,
+    openapi_url="/openapi.json" if _is_debug else None,
+)
 
 # CORS
 app.add_middleware(
