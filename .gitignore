@@ -3,3 +3,5 @@ __pycache__/
 *.db
 .env
 *.egg-info/
+debt_clock.db
+alerts_history.jsonl
