@@ -1,0 +1,66 @@
+name: OpenClaw Debt Clock Agent
+
+on:
+  schedule:
+    - cron: '51 */3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  openclaw-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reality check - verify site loads
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://us-debt-clock.onrender.com)
+          echo "Site status: $STATUS"
+          if [ "$STATUS" = "000" ]; then
+            echo "SITE_STATUS=DOWN (Render sleeping)" >> $GITHUB_ENV
+          else
+            echo "SITE_STATUS=UP ($STATUS)" >> $GITHUB_ENV
+          fi
+
+      - name: Install OpenClaw
+        run: npm install -g openclaw
+
+      - name: Run agent
+        env:
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          openclaw agent --local --timeout 120 --message "$(cat <<'PROMPT'
+          You are the US Debt Clock distribution agent. Site: us-debt-clock.onrender.com
+          Site status: ${{ env.SITE_STATUS }}
+
+          Read comms/openclaw_memory.md for context and task queue.
+
+          MISSION: Find distribution channels for our embeddable real-time US debt clock.
+          Our edge: WebSocket real-time data from Treasury + FRED APIs (not calculated estimates).
+          Embed API: $9/mo on Stripe (prod_UKHBbmRC8eGs1S).
+
+          DO THESE TASKS:
+          1. Search "embed debt clock website" — find sites wanting embeddable widgets
+          2. Search "US national debt tracker 2026" — find who's talking about debt tools
+          3. Find finance/economics forums discussing debt ceiling or national debt
+          4. Find sites linking to usdebtclock.org — they might want our real-time alternative
+          5. Search for financial tool directories we should be listed on
+          6. Check if PGPF (pgpf.org) has a tools/resources page we can get listed on
+          7. Generate 2 tweets about the national debt with link to us-debt-clock.onrender.com
+
+          APPEND findings to comms/openclaw_memory.md with timestamp.
+          Format: ## Run YYYY-MM-DD HH:MM UTC
+          PROMPT
+          )"
+
+      - name: Commit memory updates
+        run: |
+          git config user.name "openclaw-bot"
+          git config user.email "openclaw-bot@repairxpert.ai"
+          git add comms/openclaw_memory.md
+          git diff --staged --quiet || git commit -m "openclaw: debt clock distribution scan $(date -u +%Y-%m-%d)"
+          git push || echo "Push failed - will retry next run"
