@@ -29,13 +29,20 @@ jobs:
             echo "SITE_STATUS=UP ($STATUS)" >> $GITHUB_ENV
           fi
 
+      - name: Install and configure OpenClaw
+        run: |
+          npm install -g openclaw@latest
+          mkdir -p ~/.openclaw/agents/main/agent ~/.openclaw/workspace
+          echo '{"minimax":{"provider":"minimax","profileId":"minimax","token":"${{ secrets.MINIMAX_API_KEY }}"}}' > ~/.openclaw/agents/main/agent/auth-profiles.json
+          echo '{"agents":{"defaults":{"model":"minimax/MiniMax-M2.7","workspace":"~/.openclaw/workspace"}},"gateway":{"port":18789,"mode":"local","bind":"loopback","auth":{"mode":"token","token":"ghactions"}}}' > ~/.openclaw/openclaw.json
+          cp comms/openclaw_memory.md ~/.openclaw/workspace/MEMORY.txt 2>/dev/null || true
+
       - name: Run agent
         env:
           MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
-          npm install -g openclaw@latest
-          openclaw agent --local --timeout 120 --message "$(cat <<'PROMPT'
+          openclaw agent --local --agent main --timeout 120 --message "$(cat <<'PROMPT'
           You are the US Debt Clock distribution agent. Site: us-debt-clock.onrender.com
           Site status: ${{ env.SITE_STATUS }}
 
