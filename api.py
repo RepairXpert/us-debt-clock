@@ -369,6 +369,113 @@ def get_regime_description(regime: str) -> str:
     return descriptions.get(regime, "Unknown regime")
 
 
+@app.get("/embed", response_class=HTMLResponse)
+async def get_embed():
+    """Minimal iframe-friendly embed showing the live debt counter"""
+    debt = CURRENT_DATA.get("national_debt", 0)
+    daily_deficit = CURRENT_DATA.get("deficit", 0)
+    per_second = daily_deficit / 86400 if daily_deficit else 100000 / 86400
+    population = 335e6
+    debt_per_capita = debt / population if debt else 0
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>US National Debt - Live</title>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:#0f172a;color:#f1f5f9;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:20px;overflow:hidden;
+}}
+.counter{{
+  background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(139,92,246,0.15));
+  border:1px solid #334155;border-radius:12px;padding:24px 32px;
+  text-align:center;width:100%;max-width:480px;
+}}
+.label{{color:#94a3b8;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px}}
+.debt{{
+  font-size:2rem;font-weight:700;font-family:'Monaco',monospace;
+  color:#3b82f6;text-shadow:0 0 15px rgba(59,130,246,0.4);margin-bottom:4px;
+}}
+.rate{{color:#f59e0b;font-size:0.85rem;margin-bottom:12px}}
+.secondary{{display:flex;justify-content:space-between;gap:16px;margin-top:12px;padding-top:12px;border-top:1px solid #334155}}
+.stat{{text-align:center;flex:1}}
+.stat-val{{font-size:1rem;font-weight:600;color:#60a5fa;font-family:'Monaco',monospace}}
+.stat-label{{font-size:0.65rem;color:#94a3b8;margin-top:2px}}
+.branding{{margin-top:10px;font-size:0.6rem;color:#475569}}
+.branding a{{color:#3b82f6;text-decoration:none}}
+</style>
+</head>
+<body>
+<div class="counter">
+  <div class="label">US National Debt</div>
+  <div class="debt" id="debt">$0</div>
+  <div class="rate" id="rate"></div>
+  <div class="secondary">
+    <div class="stat">
+      <div class="stat-val" id="percap">$0</div>
+      <div class="stat-label">Per Citizen</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="persec">$0</div>
+      <div class="stat-label">Per Second</div>
+    </div>
+  </div>
+  <div class="branding">Powered by <a href="https://us-debt-clock.onrender.com" target="_blank" rel="noopener">US Debt Clock</a></div>
+</div>
+<script>
+(function(){{
+  let debt={debt};
+  const rate={per_second};
+  const pop={population};
+  const fmt=n=>'$'+n.toLocaleString('en-US',{{maximumFractionDigits:0}});
+  const fmtD=n=>'$'+n.toLocaleString('en-US',{{maximumFractionDigits:2}});
+  function tick(){{
+    debt+=rate;
+    document.getElementById('debt').textContent=fmt(debt);
+    document.getElementById('percap').textContent=fmtD(debt/pop);
+    document.getElementById('persec').textContent=fmt(Math.round(rate));
+    document.getElementById('rate').textContent='Increasing '+fmt(Math.round(rate))+'/sec';
+  }}
+  tick();
+  setInterval(tick,1000);
+}})();
+</script>
+</body>
+</html>"""
+
+
+@app.get("/api/embed-code")
+async def get_embed_code():
+    """Returns the HTML snippet customers paste into their site"""
+    base_url = os.getenv("RENDER_EXTERNAL_URL", "https://us-debt-clock.onrender.com")
+    snippet = (
+        f'<iframe src="{base_url}/embed" '
+        f'width="500" height="260" '
+        f'style="border:none;border-radius:12px;overflow:hidden;" '
+        f'title="US National Debt - Live Counter" '
+        f'loading="lazy"></iframe>'
+    )
+    return JSONResponse({
+        "embed_code": snippet,
+        "instructions": "Paste this HTML into your website to display a live US debt counter.",
+        "customization": {
+            "width": "Adjust width attribute (min 320px recommended)",
+            "height": "Adjust height attribute (min 220px recommended)",
+        },
+        "pricing": {
+            "plan": "Debt Clock Embed API",
+            "price": "$9/month",
+            "subscribe_url": "https://us-debt-clock.onrender.com/pricing",
+        },
+    })
+
+
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard():
     """Serve the dashboard"""
